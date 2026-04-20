@@ -1,5 +1,5 @@
 from sqlalchemy import String, Enum, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 import enum
 from .base import Base
@@ -16,4 +16,4 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.CLIENT)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    professional_profile: Mapped["Professional"] = relationship("Professional", back_populates="user")

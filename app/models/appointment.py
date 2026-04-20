@@ -20,6 +20,6 @@ class Appointment(Base):
     end_time: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
     status: Mapped[AppointmentStatus] = mapped_column(Enum(AppointmentStatus), default=AppointmentStatus.SCHEDULED)
 
-    client: relationship("User")
-    professional: relationship("Professional")
-    service: relationship("Service")
+    client: Mapped["User"] = relationship("User")
+    professional: Mapped["Professional"] = relationship("Professional")
+    service: Mapped["Service"] = relationship("Service")
