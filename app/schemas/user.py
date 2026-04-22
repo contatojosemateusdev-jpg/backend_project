@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Optional
 from app.models.user import UserRole
 
 class UserBase(BaseModel):
@@ -19,7 +20,7 @@ class User(UserBase):
         from_attributes = True
 
 class UserUpdate(BaseModel):
-    full_name: str | None = None
-    email: EmailStr | None = None
-    password: str | None = None
-    role: UserRole | None = None
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role: Optional[UserRole] = None
