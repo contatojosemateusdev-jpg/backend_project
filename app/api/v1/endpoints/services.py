@@ -62,11 +62,11 @@ def delete_service(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin)
 ):
-    """Delete a service from the catalog (Admin only)."""
+    """Deactivate a service from the catalog (Admin only)."""
     service = db.query(ServiceModel).filter(ServiceModel.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    db.delete(service)
+    service.is_active = False
     db.commit()
     return None
