@@ -8,6 +8,39 @@ from typing import List
 
 router = APIRouter()
 
+def _validate_working_hours_overlap(db: Session, professional_id: int, slots: List[WorkingHourCreate], replace_all: bool = False):
+    """Helper to validate that working hour slots do not overlap for a professional."""
+    # Get existing slots if we are not replacing all
+    existing_slots = []
+    if not replace_all:
+        existing_slots = db.query(WorkingHourModel).filter(
+            WorkingHourModel.professional_id == professional_id
+        ).all()
+
+    # Combine existing and new slots for overlap check
+    all_slots = []
+    for s in existing_slots:
+        all_slots.append({"day": s.day_of_week, "start": s.start_time, "end": s.end_time})
+    for s in slots:
+        all_slots.append({"day": s.day_of_week, "start": s.start_time, "end": s.end_time})
+
+    # Group by day of week
+    days = {}
+    for s in all_slots:
+        days.setdefault(s["day"], []).append((s["start"], s["end"]))
+
+    for day, ranges in days.items():
+        # Sort ranges by start time
+        ranges.sort()
+        for i in range(len(ranges) - 1):
+            current_end = ranges[i][1]
+            next_start = ranges[i+1][0]
+            if current_end > next_start:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Working hour slots overlap on day {day}"
+                )
+
 @router.get("/", response_model=list[Professional])
 def list_professionals(db: Session = Depends(get_db)):
     """List all professionals in the barbershop."""
@@ -102,6 +135,9 @@ def create_working_hours(
     if not professional:
         raise HTTPException(status_code=404, detail="Professional not found")
 
+    # Validate overlaps
+    _validate_working_hours_overlap(db, prof_id, working_hours_in, replace_all=False)
+
     new_slots = []
     for slot in working_hours_in:
         if slot.start_time >= slot.end_time:
@@ -135,6 +171,9 @@ def replace_working_hours(
     professional = db.query(ProfessionalModel).filter(ProfessionalModel.id == prof_id).first()
     if not professional:
         raise HTTPException(status_code=404, detail="Professional not found")
+
+    # Validate overlaps among new slots
+    _validate_working_hours_overlap(db, prof_id, working_hours_in, replace_all=True)
 
     # Delete all existing slots
     db.query(WorkingHourModel).filter(WorkingHourModel.professional_id == prof_id).delete()

@@ -21,15 +21,30 @@ def check_availability(db: Session, professional_id: int, start_time: datetime, 
     working_slots = db.query(WorkingHourModel).filter(
         WorkingHourModel.professional_id == professional_id,
         WorkingHourModel.day_of_week == day_of_week
-    ).all()
+    ).order_by(WorkingHourModel.start_time).all()
 
     if not working_slots:
         return False
 
-    # The appointment must fit entirely within at least one working slot
+    # Merge contiguous or overlapping slots
+    merged_slots = []
+    if working_slots:
+        current_start = working_slots[0].start_time
+        current_end = working_slots[0].end_time
+
+        for next_slot in working_slots[1:]:
+            if next_slot.start_time <= current_end:
+                current_end = max(current_end, next_slot.end_time)
+            else:
+                merged_slots.append((current_start, current_end))
+                current_start = next_slot.start_time
+                current_end = next_slot.end_time
+        merged_slots.append((current_start, current_end))
+
+    # The appointment must fit entirely within one of the merged working slots
     is_within_working_hours = any(
-        slot.start_time <= start_t and slot.end_time >= end_t
-        for slot in working_slots
+        slot_start <= start_t and slot_end >= end_t
+        for slot_start, slot_end in merged_slots
     )
 
     if not is_within_working_hours:
@@ -64,6 +79,8 @@ def create_appointment(
 
     # 3. Calculate end time
     start_time = appointment_in.start_time
+    if start_time < datetime.now(datetime.timezone.utc):
+        raise HTTPException(status_code=400, detail="Cannot book appointments in the past")
     end_time = start_time + timedelta(minutes=service.duration_minutes)
 
     # 4. Check availability
@@ -115,6 +132,10 @@ def update_appointment(
         appointment.status = appointment_update.status
 
     if appointment_update.start_time:
+        # Prevent past appointments
+        if appointment_update.start_time < datetime.now(datetime.timezone.utc):
+            raise HTTPException(status_code=400, detail="Cannot move appointments to the past")
+
         # Re-calculate end time based on the service
         service = db.query(ServiceModel).filter(ServiceModel.id == appointment.service_id).first()
         new_start = appointment_update.start_time
